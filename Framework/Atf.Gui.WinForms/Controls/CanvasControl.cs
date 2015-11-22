@@ -60,8 +60,15 @@ namespace Sce.Atf.Controls
         /// client coordinates</summary>
         public virtual Matrix Transform
         {
-            get { return Sce.Atf.GdiUtil.GetTransform(m_scroll, m_xZoom, m_yZoom); }
+            get
+            {
+                m_transform.Reset();
+                m_transform.Translate(m_scroll.X, m_scroll.Y);
+                m_transform.Scale(m_xZoom, m_yZoom);
+                return m_transform;
+            }
         }
+        private readonly Matrix m_transform = new Matrix();
 
         /// <summary>
         /// Gets whether interactive zooming is uniform on x and y axes</summary>
@@ -71,7 +78,7 @@ namespace Sce.Atf.Controls
         }
 
         /// <summary>
-        /// Gets and sets zoom, for uniform zooming</summary>
+        /// Gets and sets zoom, for uniform zooming. Updates ScrollPosition.</summary>
         /// <remarks>Should be considered write-only if non-uniform zoom is used</remarks>
         public float Zoom
         {
@@ -83,7 +90,7 @@ namespace Sce.Atf.Controls
         }
 
         /// <summary>
-        /// Gets and sets zoom in the x-direction</summary>
+        /// Gets and sets zoom in the x-direction. Updates ScrollPosition.</summary>
         public float XZoom
         {
             get { return m_xZoom; }
@@ -95,7 +102,7 @@ namespace Sce.Atf.Controls
         }
 
         /// <summary>
-        /// Gets and sets zoom in the y-direction</summary>
+        /// Gets and sets zoom in the y-direction. Updates ScrollPosition.</summary>
         public float YZoom
         {
             get { return m_yZoom; }
@@ -366,6 +373,40 @@ namespace Sce.Atf.Controls
 
                 Invalidate();
             }
+        }
+
+        /// <summary>
+        /// Sets the zoom factors directly, without setting ScrollPosition.
+        /// The zoom factors will be capped to the minimum and maximum values.</summary>
+        /// <param name="xZoom">The x zoom.</param>
+        /// <param name="yZoom">The y zoom.</param>
+        public void SetZoom(float xZoom, float yZoom)
+        {
+            xZoom = Math.Max(m_minXZoom, xZoom);
+            xZoom = Math.Min(m_maxXZoom, xZoom);
+
+            yZoom = Math.Max(m_minYZoom, yZoom);
+            yZoom = Math.Min(m_maxYZoom, yZoom);
+
+            if (xZoom == m_xZoom &&
+                yZoom == m_yZoom)
+            {
+                return;
+            }
+
+            if (UniformZoom)
+            {
+                m_xZoom = m_yZoom = xZoom;
+            }
+            else
+            {
+                m_xZoom = xZoom;
+                m_yZoom = yZoom;
+            }
+
+            OnZoom();
+
+            Invalidate();
         }
 
         /// <summary>
@@ -676,35 +717,6 @@ namespace Sce.Atf.Controls
                 }
                 m_autoScrollTimer.Start();
             }
-        }
-
-        private void SetZoom(float xZoom, float yZoom)
-        {
-            xZoom = Math.Max(m_minXZoom, xZoom);
-            xZoom = Math.Min(m_maxXZoom, xZoom);
-
-            yZoom = Math.Max(m_minYZoom, yZoom);
-            yZoom = Math.Min(m_maxYZoom, yZoom);
-
-            if (xZoom == m_xZoom &&
-                yZoom == m_yZoom)
-            {
-                return;
-            }
-
-            if (UniformZoom)
-            {
-                m_xZoom = m_yZoom = xZoom;
-            }
-            else
-            {
-                m_xZoom = xZoom;
-                m_yZoom = yZoom;
-            }
-
-            OnZoom();
-
-            Invalidate();
         }
 
         private void ZoomAboutCenter(float xZoom, float yZoom)

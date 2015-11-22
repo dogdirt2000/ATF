@@ -19,6 +19,7 @@ using Sce.Atf.Controls.PropertyEditing;
 using Sce.Atf.Dom;
 
 using CircuitEditorSample.Tests;
+using PropertyGrid = Sce.Atf.Controls.PropertyEditing.PropertyGrid;
 
 namespace CircuitEditorSample
 {
@@ -43,6 +44,12 @@ namespace CircuitEditorSample
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.DoEvents(); // see http://www.codeproject.com/buglist/EnableVisualStylesBug.asp?df=100&forumid=25268&exp=0&select=984714
+
+
+            // Switch to Japanese
+            //var jp = new System.Globalization.CultureInfo("ja-JP");
+            //Thread.CurrentThread.CurrentCulture = jp;
+            //Thread.CurrentThread.CurrentUICulture = jp;
 
             // Set up localization support early on, so that user-readable strings will be localized
             //  during the initialization phase below. Use XML files that are embedded resources.
@@ -87,7 +94,7 @@ namespace CircuitEditorSample
 
                 typeof(PaletteService),                 // global palette, for drag/drop instancing
 
-                typeof(PropertyEditor),                 // property grid for editing selected objects
+                typeof(MyPropertyEditor),               // property grid for editing selected objects; uses tooltips to show property descriptions
                 typeof(GridPropertyEditor),             // grid control for editing selected objects
                 typeof(PropertyEditingCommands),        // commands for PropertyEditor and GridPropertyEditor, like Reset,
                                                         //  Reset All, Copy Value, Paste Value, Copy All, Paste All
@@ -115,6 +122,8 @@ namespace CircuitEditorSample
                 //typeof(TemplatingSupervisor),         // templated instances copy-on-edit support(optionally)
 
                 typeof(AnnotatingCommands),             // annotating commands
+                typeof(DynamicPropertyCommands),        // context commands for user-defined properties in the property editors
+                typeof(ExpressionCommands),             // 
                 typeof(CircuitTestCommands),            // circuit tester commands
 
                 typeof(PythonService),                  // scripting service for automated tests
@@ -183,6 +192,39 @@ namespace CircuitEditorSample
             }
 
             private static readonly string s_lastCategory = "Misc".Localize("abbreviation for miscellaneous");
+        }
+
+        [Export(typeof(IInitializable))]
+        [Export(typeof(IControlHostClient))]
+        [Export(typeof(PropertyEditor))]
+        [PartCreationPolicy(CreationPolicy.Any)]
+        // Demonstrates using tooltips instead of an embedded Control to display property descriptions.
+        private class MyPropertyEditor : PropertyEditor
+        {
+            /// <summary>
+            /// Constructor with parameters</summary>
+            /// <param name="commandService">ICommandService</param>
+            /// <param name="controlHostService">IControlHostService</param>
+            /// <param name="contextRegistry">IContextRegistry</param>
+            [ImportingConstructor]
+            public MyPropertyEditor(
+                ICommandService commandService,
+                IControlHostService controlHostService,
+                IContextRegistry contextRegistry)
+                : base(commandService, controlHostService, contextRegistry)
+            {
+            }
+
+            protected override void Configure(out PropertyGrid propertyGrid, out ControlInfo controlInfo)
+            {
+                // Test that DisplayTooltips works instead of the usual DisplayDescriptions.
+                propertyGrid = new PropertyGrid(PropertyGridMode.DisplayTooltips, new PropertyGridView());
+                controlInfo = new ControlInfo(
+                    "Property Editor".Localize(),
+                    "Edits selected object properties".Localize(),
+                    StandardControlGroup.Right, null,
+                    "https://github.com/SonyWWS/ATF/wiki/Property-Editing-in-ATF".Localize());
+            }
         }
     }
 }

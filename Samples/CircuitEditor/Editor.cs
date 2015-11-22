@@ -6,8 +6,10 @@ using System.ComponentModel.Composition;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
+using System.Dynamic;
 
 using Sce.Atf;
 using Sce.Atf.Adaptation;
@@ -37,7 +39,7 @@ namespace CircuitEditorSample
     [Export(typeof(Editor))]
     [Export(typeof(IInitializable))]
     [PartCreationPolicy(CreationPolicy.Shared)]
-    public class Editor : IDocumentClient, IControlHostClient, IInitializable
+    public class Editor : DynamicObject, IDocumentClient, IControlHostClient, IInitializable
     {
         /// <summary>
         /// Constructor. Creates circuit and subgraph renderers. 
@@ -73,7 +75,7 @@ namespace CircuitEditorSample
             string initialDirectory = Path.Combine(Directory.GetCurrentDirectory(), "..\\..\\..\\..\\components\\wws_atf\\Samples\\CircuitEditor\\data");
             EditorInfo.InitialDirectory = initialDirectory;
             m_theme = new D2dDiagramTheme();
-            m_circuitRenderer = new D2dCircuitRenderer<Module, Connection, ICircuitPin>(m_theme, documentRegistry);
+            m_circuitRenderer = new CircuitRenderer(m_theme, documentRegistry);
             m_subGraphRenderer = new D2dSubCircuitRenderer<Module, Connection, ICircuitPin>(m_theme);
 
             //// Note: Santa Monica uses following render settings: 
@@ -91,9 +93,8 @@ namespace CircuitEditorSample
             var xformAdapter = new TransformAdapter();
             xformAdapter.EnforceConstraints = false;//to allow the canvas to be panned to view negative coordinates
             m_d2dHoverControl.Adapt(xformAdapter, new D2dGraphAdapter<Module, Connection, ICircuitPin>(m_circuitRenderer, xformAdapter));
-            m_d2dHoverControl.DrawingD2d += m_d2dHoverControl_DrawingD2d;
+            m_d2dHoverControl.DrawingD2d += m_d2dHoverControl_DrawingD2d;           
         }
-
 
         private IControlHostService m_controlHostService;
         private ICommandService m_commandService;
@@ -118,7 +119,7 @@ namespace CircuitEditorSample
         public static readonly string CircuitFormat = Schema.NS + ":Circuit";
 
         // scripting related members
-        [Import(AllowDefault = true)]
+        [Import(AllowDefault = false)]
         private ScriptingService m_scriptingService = null;
 
         #region IInitializable
@@ -325,6 +326,10 @@ namespace CircuitEditorSample
             if (circuitNode.Is<Circuit>())
             {
                 var circuitAdapter = new D2dGraphAdapter<Module, Connection, ICircuitPin>(m_circuitRenderer, transformAdapter);
+
+                // The "AllFirst" policy will try to draw edges (wires) before nodes, as much as possible.
+                //circuitAdapter.EdgeRenderPolicy = D2dGraphAdapter<Module, Connection, ICircuitPin>.DrawEdgePolicy.AllFirst;
+                
                 var circuitModuleEditAdapter = new D2dGraphNodeEditAdapter<Module, Connection, ICircuitPin>(
                     m_circuitRenderer, circuitAdapter, transformAdapter);
                 circuitModuleEditAdapter.DraggingSubNodes = false;
@@ -778,6 +783,30 @@ namespace CircuitEditorSample
         private D2dDiagramTheme m_theme;
         private HoverBase m_hoverForm;
         private D2dAdaptableControl m_d2dHoverControl; // a child of hover form
+
+        #region Expression related code
+
+        // Allows getting circuit element by id
+        public override bool TryGetMember(GetMemberBinder binder, out object result)
+        {
+            // It is possible to use any of the following to get access to all 
+            // the circuit elements. 
+            var mgr = m_documentRegistry.GetMostRecentDocument<ExpressionManager>();
+            if (mgr != null)
+            {
+                foreach (var node in mgr.ExpressionNodes)
+                {
+                    if (binder.Name == node.GetId())
+                    {
+                        result = new DynamicDomNode(node);
+                        return true;
+                    }                    
+                }
+            }            
+            return base.TryGetMember(binder, out result);         
+        }
+
+        #endregion
 
     }
 }
